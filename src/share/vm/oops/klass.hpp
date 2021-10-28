@@ -25,6 +25,7 @@
 #ifndef SHARE_VM_OOPS_KLASS_HPP
 #define SHARE_VM_OOPS_KLASS_HPP
 
+#include <jni_x86.h>
 #include "gc/shared/specialized_oop_closures.hpp"
 #include "memory/iterator.hpp"
 #include "memory/memRegion.hpp"
@@ -98,14 +99,24 @@ class Klass : public Metadata {
   //
   // Final note:  This comes first, immediately after C++ vtable,
   // because it is frequently queried.
+  /**
+   * _layout_helper为对象内存布局中的一个组合描述符，如果非实例对象(InstanceKlass)或数组对象(ArrayKlass)，则_layout_helper默认值为0
+   * 对于InstanceKlass而言，value表示对象以字节为单位占用的内存空间
+   * 对于ArrayKlass而言，value为复合值，包含4个部分:
+   * 1.tag: 如果数组元素为对象实例,则为 0x80，否则为 0xC0
+   * 2.hsz: 是以字节为单位的数组头大小（即第一个元素的偏移量）
+   * 3.ebt: 数组元素类型(枚举值BasicType)
+   * 4.esz: 数组元素大小，字节为单位
+   */
   jint        _layout_helper;
-
+  // _layout_helper访问频率极高，为方便快速响应，设置以下字段用于信息统计
   // The fields _super_check_offset, _secondary_super_cache, _secondary_supers
   // and _primary_supers all help make fast subtype checks.  See big discussion
   // in doc/server_compiler/checktype.txt
   //
   // Where to look to observe a supertype (it is &_secondary_super_cache for
   // secondary supers, else is &_primary_supers[depth()].
+  // 用于快速查找supertype的偏移量
   juint       _super_check_offset;
 
   // Class name.  Instance classes: java/lang/String, etc.  Array classes: [I,
@@ -113,28 +124,38 @@ class Klass : public Metadata {
   Symbol*     _name;
 
   // Cache of last observed secondary supertype
+  // Klass指针，用于记录上一次访问的secondary supertype
   Klass*      _secondary_super_cache;
   // Array of all secondary supertypes
+  // Klass类型数组,用于记录所有secondary supertypes
   Array<Klass*>* _secondary_supers;
   // Ordered list of all primary supertypes
+  // Klass类型数组,大小固定为8,按顺序记录所有primary supertypes
   Klass*      _primary_supers[_primary_super_limit];
   // java/lang/Class instance mirroring this class
+  // oopDesc类型指针,对应java/lang/Class实例,可通过此镜像访问类中静态属性
   oop       _java_mirror;
   // Superclass
+  // Klass类型指针, 指向父类
   Klass*      _super;
   // First subclass (NULL if none); _subklass->next_sibling() is next one
+  // Klass类型指针,指向第一个子类,没有则置为null,由next_siblings属性依次指向后续的子类,形成类似链表结构
   Klass*      _subklass;
   // Sibling link (or NULL); links all subklasses of a klass
+  // Klass类型指针,依次指向后续子类
   Klass*      _next_sibling;
 
   // All klasses loaded by a class loader are chained through these links
+  // Klass类型指针，指向由ClassLoader加载的类,形成链式结构
   Klass*      _next_link;
 
   // The VM's representation of the ClassLoader used to load this class.
   // Provide access the corresponding instance java.lang.ClassLoader.
+  // ClassLoaderData类型指针,指向ClassLoader实例
   ClassLoaderData* _class_loader_data;
-
+  // 已处理的访问标志，供 Class.getModifiers使用
   jint        _modifier_flags;  // Processed access flags, for use by Class.getModifiers.
+  // 访问标志(如 private,final,static,abstract,native等),类/接口区别存储在这里
   AccessFlags _access_flags;    // Access flags. The class/interface distinction is stored here.
 
   TRACE_DEFINE_TRACE_ID_FIELD;

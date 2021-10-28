@@ -5880,6 +5880,8 @@ void ClassFileParser::parse_stream(const ClassFileStream* const stream,
   // Don't need to check whether this class name is legal or not.
   // It has been checked when constant pool is parsed.
   // However, make sure it is not an array type.
+  // 此处不需要对类名进行校验，在常量池校解析时已校验过
+  // 不过一定要保证当前类不是数组类型对象
   if (_need_verify) {
     guarantee_property(_class_name->byte_at(0) != JVM_SIGNATURE_ARRAY,
                        "Bad class name in class file %s",

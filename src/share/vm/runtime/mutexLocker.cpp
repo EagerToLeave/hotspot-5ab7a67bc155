@@ -171,15 +171,19 @@ void assert_lock_strong(const Monitor * lock) {
 }
 
 // Using Padded subclasses to prevent false sharing of these global monitors and mutexes.
+// // 使用填充子类来防止这些全局监视器和互斥体的错误共享
+// jvm中同步指令
 void mutex_init() {
   def(tty_lock                     , PaddedMutex  , event,       true,  Monitor::_safepoint_check_never);      // allow to lock in VM
 
   def(CGC_lock                     , PaddedMonitor, special,     true,  Monitor::_safepoint_check_never);      // coordinate between fore- and background GC
   def(STS_lock                     , PaddedMonitor, leaf,        true,  Monitor::_safepoint_check_never);
 
+  // 使用CMS或者G1会定义一个FullGcCount_lock同步指令,用于统计FullGc发生次数
   if (UseConcMarkSweepGC || UseG1GC) {
     def(FullGCCount_lock           , PaddedMonitor, leaf,        true,  Monitor::_safepoint_check_never);      // in support of ExplicitGCInvokesConcurrent
   }
+  // 使用G1收集器时额外注册的同步指令
   if (UseG1GC) {
     def(SATB_Q_FL_lock             , PaddedMutex  , access,      true,  Monitor::_safepoint_check_never);
     def(SATB_Q_CBL_mon             , PaddedMonitor, access,      true,  Monitor::_safepoint_check_never);
@@ -204,6 +208,7 @@ void mutex_init() {
   def(ParGCRareEvent_lock          , PaddedMutex  , leaf     ,   true,  Monitor::_safepoint_check_sometimes);
   def(DerivedPointerTableGC_lock   , PaddedMutex  , leaf,        true,  Monitor::_safepoint_check_never);
 #ifdef INCLUDE_ALL_GCS
+  // 所有GC收集器都具有的同步指令，阶段管理同步
   def(CGCPhaseManager_lock         , PaddedMonitor, leaf,        false, Monitor::_safepoint_check_sometimes);
 #endif
   def(CodeCache_lock               , PaddedMutex  , special,     true,  Monitor::_safepoint_check_never);

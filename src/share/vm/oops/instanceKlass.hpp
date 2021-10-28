@@ -25,6 +25,7 @@
 #ifndef SHARE_VM_OOPS_INSTANCEKLASS_HPP
 #define SHARE_VM_OOPS_INSTANCEKLASS_HPP
 
+#include <utilities/globalDefinitions_gcc.hpp>
 #include "classfile/classLoader.hpp"
 #include "classfile/classLoaderData.hpp"
 #include "classfile/moduleEntry.hpp"
@@ -111,7 +112,7 @@ class OopMapBlock VALUE_OBJ_CLASS_SPEC {
 };
 
 struct JvmtiCachedClassFileData;
-
+// java类在jvm中的内存表示,包含了类在执行过程中需要的必要信息
 class InstanceKlass: public Klass {
   friend class VMStructs;
   friend class JVMCIVMStructs;
@@ -146,12 +147,16 @@ class InstanceKlass: public Klass {
   // must add this field to InstanceKlass::metaspace_pointers_do().
 
   // Annotations for this class
+  // Annotation类型指针 指向类中注解属性
   Annotations*    _annotations;
   // Package this class is defined in
+  // PackageEntry类型指针 标明这个类所在的包
   PackageEntry*   _package_entry;
   // Array classes holding elements of this class.
+  // 数组类型为该元素的指针 (使用volatile修饰)
   Klass* volatile _array_klasses;
   // Constant pool for this class.
+  // 类常量池
   ConstantPool* _constants;
   // The InnerClasses attribute and EnclosingMethod attribute. The
   // _inner_classes is an array of shorts. If the class has InnerClasses
@@ -164,6 +169,11 @@ class InstanceKlass: public Klass {
   // number_of_inner_classes * 4. If the class has both InnerClasses
   // and EnclosingMethod attributes the _inner_classes array length is
   // number_of_inner_classes * 4 + enclosing_method_attribute_size.
+  // short类型数组,用于存放内部类属性和内部封闭方法属性(方法区常量池中的Code属性表)
+  // 如果此类中包含内部类属性,则_inner_classes属性会以4个short类型索引为首(内部类信息索引、外部类信息索引、内部类名称索引、内部类访问标识)
+  // 如果内部封闭方法属性存在,则会占用数组最后两位(类索引和方法索引)
+  // 如果只存在内部类属性,则此数组长度是内部类数量属性值*4
+  // 如果内部类和内部封闭方法同时存在,则此数组长度为内部类数量属性值*4 + 内部封闭方法属性值
   Array<jushort>* _inner_classes;
 
   // the source debug extension for this klass, NULL if not specified.
@@ -172,20 +182,29 @@ class InstanceKlass: public Klass {
   const char*     _source_debug_extension;
   // Array name derived from this class which needs unreferencing
   // if this class is unloaded.
+  // 该类型数组名称, 如果类被卸载,则该类的数组名称需要被取消引用
   Symbol*         _array_name;
 
   // Number of heapOopSize words used by non-static fields in this klass
   // (including inherited fields but after header_size()).
+  // 非静态字段内存大小,以heapOopSize为单位(默认开启指针压缩时heapOopSize为int类型大小)
   int             _nonstatic_field_size;
+  // 静态字段内存大小,以字宽为单位(HeapWordSize,实际是一个指针变量的内存大小)
   int             _static_field_size;    // number words used by static fields (oop and non-oop) in this klass
+
   // Constant pool index to the utf8 entry of the Generic signature,
   // or 0 if none.
+  // 通用签名的 utf8 条目的常量池索引,不存在则为0
   u2              _generic_signature_index;
   // Constant pool index to the utf8 entry for the name of source file
   // containing this klass, 0 if not specified.
+  // 源文件名的 utf8 条目的常量池索引, 包含此类别，如果未指定，则为 0
   u2              _source_file_name_index;
+  // 该类中静态 oop 字段(静态类型引用)的数量
   u2              _static_oop_field_count;// number of static oop fields in this klass
+  // 声明的 Java 字段数
   u2              _java_fields_count;    // The number of declared Java fields
+  //
   int             _nonstatic_oop_map_size;// size in words of nonstatic oop map blocks
 
   int             _itable_len;           // length of Java itable (in words)
@@ -231,6 +250,7 @@ class InstanceKlass: public Klass {
   u2              _misc_flags;
   u2              _minor_version;        // minor version number of class file
   u2              _major_version;        // major version number of class file
+  // 指向执行初始化的当前线程的指针（处理递归初始化）
   Thread*         _init_thread;          // Pointer to current thread doing initialization (to handle recusive initialization)
   OopMapCache*    volatile _oop_map_cache;   // OopMapCache for all methods in the klass (allocated lazily)
   JNIid*          _jni_ids;              // First JNI identifier for static fields in this class
@@ -287,6 +307,14 @@ class InstanceKlass: public Klass {
   //     [generic signature index]
   //     [generic signature index]
   //     ...
+  /**
+   * 类的字段属性，每个字段有6个属性
+   * access, name index, sig index, initial value index, low_offset, high_offset
+   * 6个组成一个数组，access表示访问控制属性
+   * 根据name index可以获取属性名
+   * 根据initial value index可以获取初始值
+   * 根据low_offset, high_offset可以获取该属性在内存中的偏移量
+   */
   Array<u2>*      _fields;
 
   // embedded Java vtable follows here
@@ -308,6 +336,16 @@ class InstanceKlass: public Klass {
   //   or an anonymous class loaded through normal classloading does not
   //   have this embedded field.
   //
+
+  /**
+   *  接下来几个属性是内嵌的在类中的，没有对应的属性名，只能通过指针和偏移量的方式访问：
+   *  Java vtable：Java虚函数表，大小等于_vtable_len
+   *  Java itables：Java接口函数表，大小等于 _itable_len
+   *  非静态oop-map blocks ，大小等于_nonstatic_oop_map_size
+   *  接口的实现类，仅当前类表示一个接口时存在，如果接口没有任何实现类则为NULL
+   *  如果只有一个实现类则为该实现类的Klass指针，如果有多个实现类，为当前类本身
+   *  host klass，只在匿名类中存在，为了支持JSR 292中的动态语言特性，会给匿名类生成一个host klass
+   */
 
   friend class SystemDictionary;
 

@@ -87,9 +87,13 @@ void perfMemory_exit();
 void ostream_exit();
 
 void vm_init_globals() {
+  // 检测ThreadShadow
   check_ThreadShadow();
+  // 初始化基本数据类型
   basic_types_init();
+  // 初始化日志事件
   eventlog_init();
+  // 初始化同步原语
   mutex_init();
   chunkpool_init();
   perfMemory_init();

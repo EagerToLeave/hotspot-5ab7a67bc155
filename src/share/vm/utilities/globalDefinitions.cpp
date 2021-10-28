@@ -53,7 +53,7 @@ void basic_fatal(const char* msg) {
 }
 
 // Something to help porters sleep at night
-
+// java基本类型数据(放在常量池中)初始化
 void basic_types_init() {
 #ifdef ASSERT
 #ifdef _LP64

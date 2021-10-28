@@ -231,7 +231,7 @@ class MetaspaceObj {
   bool is_metaspace_object() const;
   bool is_shared() const;
   void print_address_on(outputStream* st) const;  // nonvirtual address printing
-
+// 对象类型定义
 #define METASPACE_OBJ_TYPES_DO(f) \
   f(Unknown) \
   f(Class) \

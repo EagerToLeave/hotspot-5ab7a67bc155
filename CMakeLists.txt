@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.19)
+cmake_minimum_required(VERSION 3.15.3)
 project(hotspot_5ab7a67bc155)
 
 include_directories(./src/share/vm)

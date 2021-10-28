@@ -79,6 +79,7 @@
 #include "utilities/events.hpp"
 #include "utilities/growableArray.hpp"
 #include "utilities/vmError.hpp"
+#include "os_aix.hpp"
 
 // put OS-includes here (sorted alphabetically)
 #include <errno.h>
@@ -835,19 +836,20 @@ bool os::create_thread(Thread* thread, ThreadType thr_type,
   assert(thread->osthread() == NULL, "caller responsible");
 
   // Allocate the OSThread object.
+  // 创建OSThread对象
   OSThread* osthread = new OSThread(NULL, NULL);
   if (osthread == NULL) {
     return false;
   }
 
   // Set the correct thread state.
-  // 为线程设置正确的状态
+  // 设置线程类型(ThreadType枚举类型)
   osthread->set_thread_type(thr_type);
 
   // Initial state is ALLOCATED but not INITIALIZED
   // 线程初始化之后的状态为已分配
   osthread->set_state(ALLOCATED);
-  // 将传进来的线程与操作系统分配的线程进行关联，相当于VMThread对象指针指向操作系统线程，即VMThread对象对操作系统内核线程进行属性操作
+  // 将传进来的VMThread线程与操作系统分配的线程进行关联，相当于VMThread对象指针指向操作系统线程，即VMThread对象对操作系统内核线程进行属性操作
   thread->set_osthread(osthread);
 
   // Init thread attributes.
@@ -866,12 +868,14 @@ bool os::create_thread(Thread* thread, ThreadType thr_type,
   guarantee(pthread_attr_setsuspendstate_np(&attr, PTHREAD_CREATE_SUSPENDED_NP) == 0, "???");
 
   // Calculate stack size if it's not specified by caller.
+  // 计算线程栈初始大小
   size_t stack_size = os::Posix::get_initial_stack_size(thr_type, req_stack_size);
 
   // On Aix, pthread_attr_setstacksize fails with huge values and leaves the
   // thread size in attr unchanged. If this is the minimal stack size as set
   // by pthread_attr_init this leads to crashes after thread creation. E.g. the
   // guard pages might not fit on the tiny stack created.
+  // todo 设置操作数栈大小？
   int ret = pthread_attr_setstacksize(&attr, stack_size);
   if (ret != 0) {
     log_warning(os, thread)("The thread stack size specified is invalid: " SIZE_FORMAT "k",
@@ -3472,6 +3476,7 @@ jint os::init_2(void) {
   trcVerbose("physical memory: %lu", Aix::_physical_memory);
 
   // Initially build up the loaded dll map.
+  //
   LoadedLibraries::reload();
   if (Verbose) {
     trcVerbose("Loaded Libraries: ");

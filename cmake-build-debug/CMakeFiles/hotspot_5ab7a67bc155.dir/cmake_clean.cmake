@@ -1155,8 +1155,9 @@ file(REMOVE_RECURSE
   "CMakeFiles/hotspot_5ab7a67bc155.dir/test/serviceability/jvmti/ModuleAwareAgents/ThreadStart/libMAAThreadStart.c.o"
   "CMakeFiles/hotspot_5ab7a67bc155.dir/test/serviceability/jvmti/StartPhase/AllowedFunctions/libAllowedFunctions.c.o"
   "CMakeFiles/hotspot_5ab7a67bc155.dir/test/testlibrary/jvmti/libSimpleClassFileLoadHook.c.o"
-  "hotspot_5ab7a67bc155"
+  "hotspot_5ab7a67bc155.exe"
   "hotspot_5ab7a67bc155.pdb"
+  "libhotspot_5ab7a67bc155.dll.a"
 )
 
 # Per-language clean rules from dependency scanning.

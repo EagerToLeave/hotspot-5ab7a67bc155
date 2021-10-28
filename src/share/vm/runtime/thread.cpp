@@ -157,6 +157,7 @@ void universe_post_module_init();  // must happen after call_initPhase2
 
 #ifndef USE_LIBRARY_BASED_TLS_ONLY
 // Current thread is maintained as a thread-local variable
+// 维护线程相关局部变量
 THREAD_LOCAL_DECL Thread* Thread::_thr_current = NULL;
 #endif
 // Class hierarchy
@@ -302,6 +303,7 @@ void Thread::initialize_thread_current() {
   _thr_current = this;
 #endif
   assert(ThreadLocalStorage::thread() == NULL, "ThreadLocalStorage::thread already initialized");
+  // 将当前线程放入TLS
   ThreadLocalStorage::set_thread(this);
   assert(Thread::current() == ThreadLocalStorage::thread(), "TLS mismatch!");
 }
@@ -951,6 +953,7 @@ static void initialize_class(Symbol* class_name, TRAPS) {
 
 
 // Creates the initial ThreadGroup
+// 创建初始化线程组
 static Handle create_initial_thread_group(TRAPS) {
   Klass* k = SystemDictionary::resolve_or_fail(vmSymbols::java_lang_ThreadGroup(), true, CHECK_NH);
   InstanceKlass* ik = InstanceKlass::cast(k);
@@ -984,6 +987,7 @@ static Handle create_initial_thread_group(TRAPS) {
 }
 
 // Creates the initial Thread
+// 创建初始线程
 static oop create_initial_thread(Handle thread_group, JavaThread* thread,
                                  TRAPS) {
   Klass* k = SystemDictionary::resolve_or_fail(vmSymbols::java_lang_Thread(), true, CHECK_NULL);
@@ -3424,37 +3428,46 @@ static void call_initPhase3(TRAPS) {
                                          vmSymbols::void_method_signature(), CHECK);
 }
 
+// 初始化java核心类文件
 void Threads::initialize_java_lang_classes(JavaThread* main_thread, TRAPS) {
   TraceTime timer("Initialize java.lang classes", TRACETIME_LOG(Info, startuptime));
 
   if (EagerXrunInit && Arguments::init_libraries_at_startup()) {
     create_vm_init_libraries();
   }
-
+  // 创建String类
   initialize_class(vmSymbols::java_lang_String(), CHECK);
 
   // Inject CompactStrings value after the static initializers for String ran.
+  // 在 String 的静态初始值设定项运行后注入 CompactStrings 值。
   java_lang_String::set_compact_strings(CompactStrings);
 
   // Initialize java_lang.System (needed before creating the thread)
+  // 在创建线程前必须先创建System类
   initialize_class(vmSymbols::java_lang_System(), CHECK);
   // The VM creates & returns objects of this class. Make sure it's initialized.
+  // 创建Class类,此类由虚拟机创建,并确保其实例化
   initialize_class(vmSymbols::java_lang_Class(), CHECK);
+  // 初始化线程组
   initialize_class(vmSymbols::java_lang_ThreadGroup(), CHECK);
   Handle thread_group = create_initial_thread_group(CHECK);
   Universe::set_main_thread_group(thread_group());
   initialize_class(vmSymbols::java_lang_Thread(), CHECK);
   oop thread_object = create_initial_thread(thread_group, main_thread, CHECK);
+  // 将main_thread指向java中的thread_object
   main_thread->set_threadObj(thread_object);
   // Set thread status to running since main thread has
   // been started and running.
+  // 设置thread_object对象中线程状态,此时线程已经启动并开始运行(RUNNABLE)
   java_lang_Thread::set_thread_status(thread_object,
                                       java_lang_Thread::RUNNABLE);
 
   // The VM creates objects of this class.
+  // 创建Module类
   initialize_class(vmSymbols::java_lang_Module(), CHECK);
 
   // The VM preresolves methods to these classes. Make sure that they get initialized
+  // VM 将方法预解析为这些类。确保它们被初始化
   initialize_class(vmSymbols::java_lang_reflect_Method(), CHECK);
   initialize_class(vmSymbols::java_lang_ref_Finalizer(), CHECK);
 
@@ -3462,10 +3475,13 @@ void Threads::initialize_java_lang_classes(JavaThread* main_thread, TRAPS) {
   call_initPhase1(CHECK);
 
   // get the Java runtime name after java.lang.System is initialized
+  //  获取 java.lang.System 初始化后的 Java 运行时名称
   JDK_Version::set_runtime_name(get_java_runtime_name(THREAD));
+  //  获取 java.lang.System 初始化后的 Java 运行时版本号
   JDK_Version::set_runtime_version(get_java_runtime_version(THREAD));
 
   // an instance of OutOfMemory exception has been allocated earlier
+  // 创建并提前分配各类异常,位于运行时常量池
   initialize_class(vmSymbols::java_lang_OutOfMemoryError(), CHECK);
   initialize_class(vmSymbols::java_lang_NullPointerException(), CHECK);
   initialize_class(vmSymbols::java_lang_ClassCastException(), CHECK);
@@ -3484,7 +3500,7 @@ void Threads::initialize_jsr292_core_classes(TRAPS) {
   initialize_class(vmSymbols::java_lang_invoke_MemberName(), CHECK);
   initialize_class(vmSymbols::java_lang_invoke_MethodHandleNatives(), CHECK);
 }
-
+// 虚拟机初始化
 jint Threads::create_vm(JavaVMInitArgs* args, bool* canTryAgain) {
   extern void JDK_Version_init();
 
@@ -3492,9 +3508,11 @@ jint Threads::create_vm(JavaVMInitArgs* args, bool* canTryAgain) {
   VM_Version::early_initialize();
 
   // Check version
+  // 检查虚拟机版本是否支持当前jdk版本
   if (!is_supported_jni_version(args->version)) return JNI_EVERSION;
 
   // Initialize library-based TLS
+  // 初始化TLS
   ThreadLocalStorage::init();
 
   // Initialize the output stream module
@@ -3508,9 +3526,11 @@ jint Threads::create_vm(JavaVMInitArgs* args, bool* canTryAgain) {
 
   // Record VM creation timing statistics
   TraceVmCreationTime create_vm_timer;
+  // 记录虚拟机启动时间
   create_vm_timer.start();
 
   // Initialize system properties.
+  // 初始化系统属性
   Arguments::init_system_properties();
 
   // So that JDK version can be used as a discriminator when parsing arguments
@@ -3520,9 +3540,11 @@ jint Threads::create_vm(JavaVMInitArgs* args, bool* canTryAgain) {
   Arguments::init_version_specific_system_properties();
 
   // Make sure to initialize log configuration *before* parsing arguments
+  // 初始化日志配置，需要在参数解析之前完成
   LogConfiguration::initialize(create_vm_timer.begin_time());
 
   // Parse arguments
+  // 解析虚拟机参数，可能来自于配置文件或命令行之类
   jint parse_result = Arguments::parse(args);
   if (parse_result != JNI_OK) return parse_result;
 
@@ -3554,6 +3576,7 @@ jint Threads::create_vm(JavaVMInitArgs* args, bool* canTryAgain) {
   TraceTime timer("Create VM", TRACETIME_LOG(Info, startuptime));
 
   // Initialize the os module after parsing the args
+  // 解析AGRS后对虚拟机内存、栈、线程等与os模块相关的部分进行初始化
   jint os_init_2_result = os::init_2();
   if (os_init_2_result != JNI_OK) return os_init_2_result;
 
@@ -3561,25 +3584,30 @@ jint Threads::create_vm(JavaVMInitArgs* args, bool* canTryAgain) {
   if (adjust_after_os_result != JNI_OK) return adjust_after_os_result;
 
   // Initialize output stream logging
+  // 配置垃圾收集器的日志流
   ostream_init_log();
 
   // Convert -Xrun to -agentlib: if there is no JVM_OnLoad
   // Must be before create_vm_init_agents()
+  // 如果没有Jvm_Onload 则将-Xrun参数转换为 -agentlib
   if (Arguments::init_libraries_at_startup()) {
     convert_vm_init_libraries_to_agents();
   }
 
   // Launch -agentlib/-agentpath and converted -Xrun agents
+  // 初始化agent模块
   if (Arguments::init_agents_at_startup()) {
     create_vm_init_agents();
   }
 
   // Initialize Threads state
+  // 初始化线程状态
   _thread_list = NULL;
   _number_of_threads = 0;
   _number_of_non_daemon_threads = 0;
 
   // Initialize global data structures and create system classes in heap
+  // 初始化全局数据结构,包括：Event Log(日志事件)、os同步原语、为性能统计数据分配内存以及内存分配器(chunk pool)等
   vm_init_globals();
 
 #if INCLUDE_JVMCI
@@ -3592,7 +3620,9 @@ jint Threads::create_vm(JavaVMInitArgs* args, bool* canTryAgain) {
 #endif // INCLUDE_JVMCI
 
   // Attach the main thread to this os thread
+  // 创建JavaThread对象，此时并不是新开启一个线程，只是将main_thread和JavaThread进行关联，后续使用JavaThread对象对线程进行管理
   JavaThread* main_thread = new JavaThread();
+  // 设置线程状态等相关属性
   main_thread->set_thread_state(_thread_in_vm);
   main_thread->initialize_thread_current();
   // must do this before set_active_handles
@@ -3612,9 +3642,11 @@ jint Threads::create_vm(JavaVMInitArgs* args, bool* canTryAgain) {
   main_thread->create_stack_guard_pages();
 
   // Initialize Java-Level synchronization subsystem
+  // java同步模块全局初始化
   ObjectMonitor::Initialize();
 
   // Initialize global modules
+  //   //全局模块初始化，如Management模块，Bytecodes模块，ClassLoader模块，CodeCache模块，StubRoutines模块，Universe模块，Interpreter模块等
   jint status = init_globals();
   if (status != JNI_OK) {
     delete main_thread;
@@ -3627,6 +3659,7 @@ jint Threads::create_vm(JavaVMInitArgs* args, bool* canTryAgain) {
   }
 
   // Should be done after the heap is fully created
+  // 在堆内存创建完成后缓存全局变量
   main_thread->cache_global_variables();
 
   HandleMark hm;
@@ -3648,6 +3681,7 @@ jint Threads::create_vm(JavaVMInitArgs* args, bool* canTryAgain) {
     // 创建一个单例类型的VMThread
     Thread* vmthread = VMThread::vm_thread();
     // 操作系统分配线程是否成功
+    // ThreadType = vmThread
     if (!os::create_thread(vmthread, os::vm_thread)) {
       vm_exit_during_initialization("Cannot create VM thread. "
                                     "Out of system resources.");
@@ -3695,6 +3729,7 @@ jint Threads::create_vm(JavaVMInitArgs* args, bool* canTryAgain) {
 
   // Set flag that basic initialization has completed. Used by exceptions and various
   // debug stuff, that does not work until all basic classes have been initialized.
+  // 设置基本初始化已完成的标志。由异常和各种调试内容使用，直到所有基本类都初始化后才起作用
   set_init_completed();
 
   LogConfiguration::post_initialize();
@@ -3704,10 +3739,12 @@ jint Threads::create_vm(JavaVMInitArgs* args, bool* canTryAgain) {
 
   // record VM initialization completion time
 #if INCLUDE_MANAGEMENT
+  // 记录初始化完成时间
   Management::record_vm_init_completed();
 #endif // INCLUDE_MANAGEMENT
 
   // Signal Dispatcher needs to be started before VMInit event is posted
+  // 在发布 VMInit 事件之前需要启动 Signal Dispatcher
   os::signal_init(CHECK_JNI_ERR);
 
   // Start Attach Listener if +StartAttachListener or it can't be started lazily
@@ -3755,6 +3792,7 @@ jint Threads::create_vm(JavaVMInitArgs* args, bool* canTryAgain) {
   call_initPhase3(CHECK_JNI_ERR);
 
   // cache the system class loader
+  // 将系统类加载器缓存起来
   SystemDictionary::compute_java_system_loader(CHECK_(JNI_ERR));
 
 #if INCLUDE_JVMCI
@@ -3788,8 +3826,9 @@ jint Threads::create_vm(JavaVMInitArgs* args, bool* canTryAgain) {
   }
 
 #if INCLUDE_MANAGEMENT
+  // 初始化Management模块
   Management::initialize(THREAD);
-
+  // 发生等待异常则虚拟机直接退出
   if (HAS_PENDING_EXCEPTION) {
     // management agent fails to start possibly due to
     // configuration problem and is responsible for printing
@@ -3821,11 +3860,14 @@ jint Threads::create_vm(JavaVMInitArgs* args, bool* canTryAgain) {
     MutexLocker ml(PeriodicTask_lock);
     // Make sure the WatcherThread can be started by WatcherThread::start()
     // or by dynamic enrollment.
+    // 启动WatcherThread,用于执行计划任务等周期性线程类任务
+    // 确保WatcherThread能够被正常启动或者通过动态注册来启动
     WatcherThread::make_startable();
     // Start up the WatcherThread if there are any periodic tasks
     // NOTE:  All PeriodicTasks should be registered by now. If they
     //   aren't, late joiners might appear to start slowly (we might
     //   take a while to process their first tick).
+    // 存在周期性任务则开启WatcherThread去执行，如果在watcherThread启动后再注册新的计划任务则这些任务有可能会延迟执行
     if (PeriodicTask::num_tasks() > 0) {
       WatcherThread::start();
     }
